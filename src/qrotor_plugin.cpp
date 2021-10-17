@@ -113,7 +113,7 @@ void QrotorPlugin::OnUpdate(
   //  gzmsg << "dt_s: " << dt_s << std::endl;
 
   // apply wrench
-  applyWrench(thrust*E3, moment);
+  applyWrench(thrust * E3, moment);
 }
 
 void QrotorPlugin::controlThread() {
@@ -145,7 +145,22 @@ void QrotorPlugin::applyWrench(const Eigen::Vector3d &thrust_v,
   link_->AddRelativeTorque(torque - link_->GetInertial()->CoG().Cross(force));
 }
 
-void QrotorPlugin::rosPublish() {}
+void QrotorPlugin::rosPublish() {
+  auto pose = qrotor_gazebo::Pose3D(link_);
+  nav_msgs::Odometry odometry_;
+  odometry_.header.stamp.sec = world_->SimTime().sec;
+  odometry_.header.stamp.nsec = world_->SimTime().nsec;
+  odometry_.header.frame_id = "world";
+  odometry_.child_frame_id = namespace_ + "/base_link";
+  tf::quaternionEigenToMsg(quat_to_eigen_from_gazebo(pose.gpose.Rot()),
+                           odometry_.pose.pose.orientation);
+  tf::pointEigenToMsg(pose.pos, odometry_.pose.pose.position);
+  tf::vectorEigenToMsg(pose.vel, odometry_.twist.twist.linear);
+  tf::vectorEigenToMsg(pose.omega, odometry_.twist.twist.angular);
+  pub_odom_truth_.publish(odometry_);
+}
+
+void QrotorPlugin::computeInput() {}
 
 GZ_REGISTER_MODEL_PLUGIN(QrotorPlugin);
 } // namespace qrotor_gazebo

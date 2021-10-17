@@ -7,7 +7,7 @@
 #define QROTOR_GAZEBO_QROTOR_PLUGIN_H
 
 #include "qrotor_gazebo/common.h"
-
+#include <eigen_conversions/eigen_msg.h>
 #include <nav_msgs/Odometry.h>
 
 namespace qrotor_gazebo {

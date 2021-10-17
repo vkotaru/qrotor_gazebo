@@ -39,6 +39,10 @@ inline GazeboVector vec3_to_gazebo_from_eigen(const Eigen::Vector3d& vec) {
   return GazeboVector(vec(0), vec(1), vec(2));
 }
 
+inline Eigen::Quaterniond quat_to_eigen_from_gazebo(const GazeboQuaternion& quat) {
+  return Eigen::Quaterniond(quat.W(), quat.X(), quat.Y(), quat.Z());
+}
+
 inline Eigen::Matrix3d rotation_to_eigen_from_gazebo(const GazeboQuaternion& quat) {
   return Eigen::Quaternion(quat.W(), quat.X(), quat.Y(), quat.Z()).toRotationMatrix();
 }
