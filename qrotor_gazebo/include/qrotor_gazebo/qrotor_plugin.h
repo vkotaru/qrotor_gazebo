@@ -7,8 +7,11 @@
 #define QROTOR_GAZEBO_QROTOR_PLUGIN_H
 
 #include "qrotor_gazebo/common.h"
+#include "qrotor_gazebo/control.hpp"
 #include <eigen_conversions/eigen_msg.h>
+
 #include <nav_msgs/Odometry.h>
+#include <qrotor_gazebo/Command.h>
 
 namespace qrotor_gazebo {
 
@@ -24,12 +27,7 @@ protected:
   void Init() override;
 
 private:
-  gazebo::common::Time plugin_loaded_time, last_plugin_update;  
-  double ros_start_time_s = 0.0;
-  double ros_last_update_s = 0.0;
-  double ros_now_s = 0.0;
-  float ros_dt = 0.0;
-  double dtsum = 0;
+  gazebo::common::Time plugin_loaded_time, last_plugin_update;
 
   std::string namespace_;
   std::string link_name_;
@@ -49,26 +47,24 @@ private:
   // parameters
   double mass_;
   Eigen::Matrix3d inertia_;
-  // input variables
-  double thrust;
-  Eigen::Vector3d moment;
+
+  QrotorControl controller_;
 
   // ros node
   ros::NodeHandlePtr nh_;
-
-  double ctrl_loop_freq_{500};
-  // ros node control
+  double pos_loop_freq{100}, att_loop_freq{500};
   ros::NodeHandlePtr ctrl_nh_;
-  /// \brief A thread the keeps running the rosQueue
-  std::thread ctrlQueueThread;  
-  /// \brief run firmware_node in parallel
-  void controlThread();
+  std::thread ctrlQueueThread;
+  RosClock pos_clock_{}, att_clock_{};
+  void ctrlThread();
+  void posCtrlThread();
+  void attCtrlThread();
   ros::Publisher pub_odom_truth_;
+  ros::Subscriber sub_command_;
 
-  double ctrl_start_time_s{0}, ctrl_last_update_s{0};
+  void commandCallback(const qrotor_gazebo::Command::ConstPtr &msg);
 
   // plugin functions
-  void computeInput();
   void applyWrench(const Eigen::Vector3d &thrust_v,
                    const Eigen::Vector3d &moment_v);
   void rosPublish();

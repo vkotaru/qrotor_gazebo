@@ -1,8 +1,8 @@
 /**
  * @file common.h
- * @author kotaru 
+ * @author kotaru
  * @date 10/16/21.
-*/
+ */
 
 #ifndef QROTOR_GAZEBO_COMMON_H
 #define QROTOR_GAZEBO_COMMON_H
@@ -11,6 +11,7 @@
 
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/common/common.hh>
+#include <gazebo/gazebo.hh>
 #include <gazebo/physics/Model.hh>
 #include <gazebo/physics/physics.hh>
 #include <gazebo/rendering/rendering.hh>
@@ -19,7 +20,6 @@
 #include <gazebo/sensors/SensorTypes.hh>
 #include <gazebo/sensors/sensors.hh>
 #include <ros/ros.h>
-#include <gazebo/gazebo.hh>
 
 using GazeboVector = ignition::math::Vector3d;
 using GazeboPose = ignition::math::Pose3d;
@@ -31,20 +31,44 @@ static Eigen::Vector3d E1{1., 0., 0.};
 static Eigen::Vector3d E2{0., 1., 0.};
 static Eigen::Vector3d E3{0., 0., 1.};
 
-inline Eigen::Vector3d vec3_to_eigen_from_gazebo(const GazeboVector& vec) {
+class RosClock {
+public:
+  RosClock() {
+    now_s = ros::Time::now().toSec();
+    last_update_s = ros::Time::now().toSec();
+  }
+  double now_s{0.};
+  double last_update_s{0.};
+  double dt_{0.};
+  void run() {
+    now_s = ros::Time::now().toSec();
+    dt_ = (now_s - last_update_s);
+    last_update_s = now_s;
+  }
+  double time() {
+    run();
+    return dt();
+  }
+  double dt() const { return dt_; }
+};
+
+inline Eigen::Vector3d vec3_to_eigen_from_gazebo(const GazeboVector &vec) {
   return (Eigen::Vector3d() << vec.X(), vec.Y(), vec.Z()).finished();
 }
 
-inline GazeboVector vec3_to_gazebo_from_eigen(const Eigen::Vector3d& vec) {
+inline GazeboVector vec3_to_gazebo_from_eigen(const Eigen::Vector3d &vec) {
   return GazeboVector(vec(0), vec(1), vec(2));
 }
 
-inline Eigen::Quaterniond quat_to_eigen_from_gazebo(const GazeboQuaternion& quat) {
+inline Eigen::Quaterniond
+quat_to_eigen_from_gazebo(const GazeboQuaternion &quat) {
   return Eigen::Quaterniond(quat.W(), quat.X(), quat.Y(), quat.Z());
 }
 
-inline Eigen::Matrix3d rotation_to_eigen_from_gazebo(const GazeboQuaternion& quat) {
-  return Eigen::Quaternion(quat.W(), quat.X(), quat.Y(), quat.Z()).toRotationMatrix();
+inline Eigen::Matrix3d
+rotation_to_eigen_from_gazebo(const GazeboQuaternion &quat) {
+  return Eigen::Quaternion(quat.W(), quat.X(), quat.Y(), quat.Z())
+      .toRotationMatrix();
 }
 
 /**
@@ -62,13 +86,15 @@ inline Eigen::Vector3d vee3d(Eigen::Matrix3d M) {
  * @return
  */
 Eigen::Matrix3d hat3d(Eigen::Vector3d v) {
-  return (Eigen::Matrix3d() << 0.0, -v(2), v(1), v(2), 0.0, -v(0), -v(1), v(0), 0.0).finished();
+  return (Eigen::Matrix3d() << 0.0, -v(2), v(1), v(2), 0.0, -v(0), -v(1), v(0),
+          0.0)
+      .finished();
 }
 
 struct Pose3D {
 public:
   Pose3D() = default;
-  explicit Pose3D(const gazebo::physics::LinkPtr& link_) {
+  explicit Pose3D(const gazebo::physics::LinkPtr &link_) {
     gpose = link_->WorldCoGPose();
     gvel = link_->RelativeLinearVel();
     gomega = link_->RelativeAngularVel();
@@ -96,4 +122,4 @@ public:
 
 } // namespace qrotor_gazebo
 
-#endif //QROTOR_GAZEBO_COMMON_H
+#endif // QROTOR_GAZEBO_COMMON_H

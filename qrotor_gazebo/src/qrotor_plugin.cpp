@@ -85,18 +85,17 @@ void QrotorPlugin::Load(gazebo::physics::ModelPtr _model,
   if (!ros::isInitialized()) {
     int argc = 0;
     char **argv = nullptr;
-    ros::init(argc, argv, "gazebo_client", ros::init_options::NoSigintHandler);
+    ros::init(argc, argv, "gazebo_client");
   }
 
-  // Create ROS node. This acts in a similar manner to the Gazebo node
+  pub_odom_truth_ = this->nh_->advertise<nav_msgs::Odometry>(
+      namespace_ + "/qrotor_plugin/odometry", 1);
+  sub_command_ = this->nh_->subscribe(namespace_ + "/command", 10,
+                                      &QrotorPlugin::commandCallback, this);
+
   this->ctrl_nh_ = boost::make_shared<ros::NodeHandle>(namespace_);
-
-  ctrl_start_time_s = ros::Time::now().toSec();
-  ctrl_last_update_s = ros::Time::now().toSec();
-
-  // Spin up the queue helper thread.
   this->ctrlQueueThread =
-      std::thread(std::bind(&QrotorPlugin::controlThread, this));
+      std::thread(std::bind(&QrotorPlugin::ctrlThread, this));
 
   gzdbg << "[QrotorPlugin]... loaded!";
 }
@@ -106,35 +105,51 @@ void QrotorPlugin::Init() {
   state_ = Pose3D(link_);
 }
 
-void QrotorPlugin::OnUpdate(
-    const gazebo::common::UpdateInfo &_info) { // time update
-  double dt = _info.simTime.Double() - last_plugin_update.Double();
-  last_plugin_update = _info.simTime.Double();
-  //  gzmsg << "dt_s: " << dt_s << std::endl;
+void QrotorPlugin::commandCallback(
+    const qrotor_gazebo::Command::ConstPtr &msg) {
 
-  // apply wrench
-  applyWrench(thrust * E3, moment);
+  controller_.setMode(msg->mode);
 }
 
-void QrotorPlugin::controlThread() {
-  // ros publishers
-  pub_odom_truth_ = this->ctrl_nh_->advertise<nav_msgs::Odometry>(
-      "/qrotor_plugin/odometry", 1);
+void QrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
+  double dt = _info.simTime.Double() - last_plugin_update.Double();
+  last_plugin_update = _info.simTime.Double();
+  applyWrench(controller_.thrust() * E3, controller_.moment());
+}
 
-  double ros_start_s = ros::Time::now().toSec();
-  ros::Rate loop_handle(ctrl_loop_freq_);
+void QrotorPlugin::ctrlThread() {
+  ros::Rate loop_handle(att_loop_freq);
+  int MAX_POS_CTRL_COUNT = std::ceil(att_loop_freq / pos_loop_freq);
+  int pos_ctrl_counter = MAX_POS_CTRL_COUNT;
   while (this->ctrl_nh_->ok()) {
-    // update time
-    ros_now_s = ros::Time::now().toSec();
-    ros_dt = (float)(ros_now_s - ros_last_update_s);
-    ros_last_update_s = ros_now_s;
 
-    computeInput();
-    rosPublish();
-
+    if (pos_ctrl_counter == MAX_POS_CTRL_COUNT) {
+      posCtrlThread();
+      pos_ctrl_counter = 0;
+    } else {
+      pos_ctrl_counter++;
+    }
+    attCtrlThread();
     // loop handle
     loop_handle.sleep();
   }
+}
+
+void QrotorPlugin::posCtrlThread() {
+  double dt = pos_clock_.time();
+  // compute input
+  if (controller_.mode() == QrotorControl::POSITION ||
+      controller_.mode() == QrotorControl::POSITION_SPLINE) {
+    controller_.computePositionInput();
+  }
+  // publish pose
+  rosPublish();
+}
+
+void QrotorPlugin::attCtrlThread() {
+  double dt = att_clock_.time();
+  // compute input
+  controller_.computeAttitudeInput();
 }
 
 void QrotorPlugin::applyWrench(const Eigen::Vector3d &thrust_v,
@@ -159,8 +174,6 @@ void QrotorPlugin::rosPublish() {
   tf::vectorEigenToMsg(pose.omega, odometry_.twist.twist.angular);
   pub_odom_truth_.publish(odometry_);
 }
-
-void QrotorPlugin::computeInput() {}
 
 GZ_REGISTER_MODEL_PLUGIN(QrotorPlugin);
 } // namespace qrotor_gazebo

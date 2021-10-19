@@ -17,12 +17,23 @@ find_package(catkin REQUIRED COMPONENTS
         tf2_ros
         tf2_geometry_msgs
         eigen_conversions
+        message_generation
         )
+
+add_message_files(
+        FILES
+        Spline.msg
+        Command.msg
+)
+
+generate_messages(
+        DEPENDENCIES geometry_msgs std_msgs
+)
 
 catkin_package(
           INCLUDE_DIRS include
         #  LIBRARIES qrotor_gazebo
-        CATKIN_DEPENDS roscpp gazebo_plugins gazebo_ros geometry_msgs std_msgs tf2 tf2_ros sensor_msgs
+        CATKIN_DEPENDS roscpp gazebo_plugins gazebo_ros geometry_msgs std_msgs tf2 tf2_ros sensor_msgs message_runtime
         DEPENDS EIGEN3 GAZEBO
 )
 
