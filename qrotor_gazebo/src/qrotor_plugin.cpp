@@ -90,8 +90,8 @@ void QrotorPlugin::Load(gazebo::physics::ModelPtr _model,
 
   pub_odom_truth_ = this->nh_->advertise<nav_msgs::Odometry>(
       namespace_ + "/qrotor_plugin/odometry", 1);
-  sub_command_ = this->nh_->subscribe(namespace_ + "/command", 10,
-                                      &QrotorPlugin::commandCallback, this);
+  sub_command_ =
+      this->nh_->subscribe("command", 10, &QrotorPlugin::commandCallback, this);
 
   this->ctrl_nh_ = boost::make_shared<ros::NodeHandle>(namespace_);
   this->ctrlQueueThread =
@@ -109,6 +109,35 @@ void QrotorPlugin::commandCallback(
     const qrotor_gazebo::Command::ConstPtr &msg) {
 
   controller_.setMode(msg->mode);
+  if (msg->mode == qrotor_gazebo::Command::MODE_POSITION) {
+    switch (msg->command.size()) {
+    case 3:
+      controller_.posCtrl_.updateSetpoint(
+          Eigen::Vector3d(msg->command[0].x, msg->command[0].y,
+                          msg->command[0].z),
+          Eigen::Vector3d(msg->command[1].x, msg->command[1].y,
+                          msg->command[1].z),
+          Eigen::Vector3d(msg->command[2].x, msg->command[2].y,
+                          msg->command[2].z));
+      break;
+
+    case 2:
+      controller_.posCtrl_.updateSetpoint(
+          Eigen::Vector3d(msg->command[0].x, msg->command[0].y,
+                          msg->command[0].z),
+          Eigen::Vector3d(msg->command[1].x, msg->command[1].y,
+                          msg->command[1].z));
+      break;
+
+    case 1:
+      controller_.posCtrl_.updateSetpoint(Eigen::Vector3d(
+          msg->command[0].x, msg->command[0].y, msg->command[0].z));
+      break;
+
+    default:
+      break;
+    }
+  }
 }
 
 void QrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
@@ -122,7 +151,7 @@ void QrotorPlugin::ctrlThread() {
   int MAX_POS_CTRL_COUNT = std::ceil(att_loop_freq / pos_loop_freq);
   int pos_ctrl_counter = MAX_POS_CTRL_COUNT;
   while (this->ctrl_nh_->ok()) {
-
+    state_ = Pose3D(link_);
     if (pos_ctrl_counter == MAX_POS_CTRL_COUNT) {
       posCtrlThread();
       pos_ctrl_counter = 0;
@@ -140,7 +169,7 @@ void QrotorPlugin::posCtrlThread() {
   // compute input
   if (controller_.mode() == QrotorControl::POSITION ||
       controller_.mode() == QrotorControl::POSITION_SPLINE) {
-    controller_.computePositionInput();
+    controller_.computePositionInput(dt, state_.pos, state_.vel);
   }
   // publish pose
   rosPublish();

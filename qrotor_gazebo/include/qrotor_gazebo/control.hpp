@@ -59,16 +59,13 @@ public:
   }
   const Mode &mode() const { return mode_; }
   void computeAttitudeInput() {}
-  void computePositionInput() { 
-    // thrust_vector = posCtrl_.run(); 
+  void computePositionInput(double dt, const Eigen::Vector3d &x,
+                            const Eigen::Vector3d &v) {
+    thrust_vector = posCtrl_.run(dt, x, v);
   }
 
-  double thrust() const {
-    return thrust_vector(2);
-  }
-  Eigen::Vector3d moment() const {
-    return moment_;
-  }
+  double thrust() const { return thrust_vector(2); }
+  Eigen::Vector3d moment() const { return moment_; }
 };
 
 } // namespace qrotor_gazebo

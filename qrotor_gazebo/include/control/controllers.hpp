@@ -74,6 +74,16 @@ public:
 
   void updateParams(const double &mass) { mass_ = mass; }
 
+  void updateSetpoint(Eigen::Vector3d xd) {
+    xd = std::move(xd);
+    vd.setZero();
+    ad.setZero();
+  }
+  void updateSetpoint(Eigen::Vector3d xd, Eigen::Vector3d vd) {
+    xd = std::move(xd);
+    vd = std::move(vd);
+    ad.setZero();
+  }
   void updateSetpoint(Eigen::Vector3d xd, Eigen::Vector3d vd,
                       Eigen::Vector3d ad) {
     xd = std::move(xd);

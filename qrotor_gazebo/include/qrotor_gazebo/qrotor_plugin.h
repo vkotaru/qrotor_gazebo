@@ -47,7 +47,6 @@ private:
   // parameters
   double mass_;
   Eigen::Matrix3d inertia_;
-
   QrotorControl controller_;
 
   // ros node
