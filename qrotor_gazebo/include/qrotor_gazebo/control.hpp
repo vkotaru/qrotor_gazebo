@@ -15,10 +15,25 @@ public:
     POSITION_SPLINE
   };
 
+  struct RigidBodyState {
+    RigidBodyState(Eigen::Vector3d x, Eigen::Vector3d v, Eigen::Matrix3d R,
+                   Eigen::Vector3d Om)
+        : position(x), velocity(v), rotation(R), ang_vel(Om) {}
+    RigidBodyState()
+        : position(Eigen::Vector3d::Zero()), velocity(Eigen::Vector3d::Zero()),
+          rotation(Eigen::Matrix3d::Identity()),
+          ang_vel(Eigen::Vector3d::Zero()) {}
+    Eigen::Vector3d position;
+    Eigen::Vector3d velocity;
+    Eigen::Matrix3d rotation;
+    Eigen::Vector3d ang_vel;
+  };
+
 private:
-  Mode mode_;
-  Eigen::Vector3d thrust_vector;
-  Eigen::Vector3d moment_;
+  Mode mode_{PASS_THROUGH};
+  Eigen::Vector3d thrust_vector_{0., 0., 0.};
+  Eigen::Vector3d moment_{0., 0., 0.};
+  RigidBodyState state_{};
 
 public:
   QrotorControl() {}
@@ -32,7 +47,6 @@ public:
     attCtrl_.updateParams(inertia);
   }
 
-  TSO3d des_att_{};
   FlatVariabled flats_{};
 
   void setMode(const int &mode) {
@@ -58,14 +72,25 @@ public:
     }
   }
   const Mode &mode() const { return mode_; }
-  void computeAttitudeInput() {}
-  void computePositionInput(double dt, const Eigen::Vector3d &x,
-                            const Eigen::Vector3d &v) {
-    thrust_vector = posCtrl_.run(dt, x, v);
+
+  void computeAttitudeInput(double dt) {
+    moment_ = attCtrl_.run(dt, state_.rotation, state_.ang_vel);
   }
 
-  double thrust() const { return thrust_vector(2); }
+  void computePositionInput(double dt) {
+    thrust_vector_ = posCtrl_.run(dt, state_.position, state_.velocity);
+    attCtrl_.updateCommand(thrust_vector_);
+  }
+
+  double thrust() const {
+    return thrust_vector_(2);
+  }
+
   Eigen::Vector3d moment() const { return moment_; }
+
+  void updateState(const RigidBodyState &state) {
+    state_ = state;
+  }
 };
 
 } // namespace qrotor_gazebo

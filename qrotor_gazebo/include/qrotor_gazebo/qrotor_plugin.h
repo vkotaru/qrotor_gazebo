@@ -20,8 +20,8 @@ public:
   QrotorPlugin();
   ~QrotorPlugin();
 
-protected:
-  void Reset() override;
+  protected : void
+              Reset() override;
   void Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf) override;
   void OnUpdate(const gazebo::common::UpdateInfo &_info);
   void Init() override;
@@ -40,14 +40,13 @@ private:
   // Pointer to the update event connection.
   gazebo::event::ConnectionPtr updateConnection_;
 
-  // states
-  Pose3D state_;
-  GazeboPose initial_pose_;
+  GazeboPose initial_pose_{};
+  void queryState();
 
   // parameters
-  double mass_;
-  Eigen::Matrix3d inertia_;
-  QrotorControl controller_;
+  double mass_{};
+  Eigen::Matrix3d inertia_{};
+  QrotorControl controller_{};
 
   // ros node
   ros::NodeHandlePtr nh_;

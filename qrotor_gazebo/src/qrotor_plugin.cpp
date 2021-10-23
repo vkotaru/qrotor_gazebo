@@ -70,6 +70,8 @@ void QrotorPlugin::Load(gazebo::physics::ModelPtr _model,
       link_->GetInertial()->IZZ();
   mass_ = link_->GetInertial()->Mass();
   gzdbg << "mass: " << mass_ << "\ninertia: \n" << inertia_ << std::endl;
+  controller_.posCtrl_.updateParams(mass_);
+  controller_.attCtrl_.updateParams(inertia_);
 
   // Connect the update function to the simulation
   updateConnection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
@@ -87,13 +89,12 @@ void QrotorPlugin::Load(gazebo::physics::ModelPtr _model,
     char **argv = nullptr;
     ros::init(argc, argv, "gazebo_client");
   }
-
-  pub_odom_truth_ = this->nh_->advertise<nav_msgs::Odometry>(
+  this->ctrl_nh_ = boost::make_shared<ros::NodeHandle>(namespace_);
+  pub_odom_truth_ = this->ctrl_nh_->advertise<nav_msgs::Odometry>(
       namespace_ + "/qrotor_plugin/odometry", 1);
   sub_command_ =
-      this->nh_->subscribe("command", 10, &QrotorPlugin::commandCallback, this);
+      this->ctrl_nh_->subscribe("command", 10, &QrotorPlugin::commandCallback, this);
 
-  this->ctrl_nh_ = boost::make_shared<ros::NodeHandle>(namespace_);
   this->ctrlQueueThread =
       std::thread(std::bind(&QrotorPlugin::ctrlThread, this));
 
@@ -101,8 +102,7 @@ void QrotorPlugin::Load(gazebo::physics::ModelPtr _model,
 }
 
 void QrotorPlugin::Init() {
-  // set initial pose
-  state_ = Pose3D(link_);
+  queryState();
 }
 
 void QrotorPlugin::commandCallback(
@@ -146,12 +146,24 @@ void QrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
   applyWrench(controller_.thrust() * E3, controller_.moment());
 }
 
+void QrotorPlugin::queryState() {
+
+  auto gpose = link_->WorldCoGPose();
+  auto gvel = link_->RelativeLinearVel();
+  auto gomega = link_->RelativeAngularVel();
+
+  controller_.updateState(QrotorControl::RigidBodyState(vec3_to_eigen_from_gazebo(gpose.Pos()),
+                          vec3_to_eigen_from_gazebo(gvel),
+                          rotation_to_eigen_from_gazebo(gpose.Rot()),
+                          vec3_to_eigen_from_gazebo(gomega)));
+}
+
 void QrotorPlugin::ctrlThread() {
   ros::Rate loop_handle(att_loop_freq);
   int MAX_POS_CTRL_COUNT = std::ceil(att_loop_freq / pos_loop_freq);
   int pos_ctrl_counter = MAX_POS_CTRL_COUNT;
   while (this->ctrl_nh_->ok()) {
-    state_ = Pose3D(link_);
+    queryState();
     if (pos_ctrl_counter == MAX_POS_CTRL_COUNT) {
       posCtrlThread();
       pos_ctrl_counter = 0;
@@ -169,7 +181,7 @@ void QrotorPlugin::posCtrlThread() {
   // compute input
   if (controller_.mode() == QrotorControl::POSITION ||
       controller_.mode() == QrotorControl::POSITION_SPLINE) {
-    controller_.computePositionInput(dt, state_.pos, state_.vel);
+    controller_.computePositionInput(dt);
   }
   // publish pose
   rosPublish();
@@ -178,15 +190,19 @@ void QrotorPlugin::posCtrlThread() {
 void QrotorPlugin::attCtrlThread() {
   double dt = att_clock_.time();
   // compute input
-  controller_.computeAttitudeInput();
+  if (controller_.mode() != QrotorControl::PASS_THROUGH) {
+    controller_.computeAttitudeInput(dt);
+  }
 }
 
 void QrotorPlugin::applyWrench(const Eigen::Vector3d &thrust_v,
                                const Eigen::Vector3d &moment_v) {
+
   GazeboVector force = vec3_to_gazebo_from_eigen(thrust_v);
   GazeboVector torque = vec3_to_gazebo_from_eigen(moment_v);
   link_->AddRelativeForce(force);
-  link_->AddRelativeTorque(torque - link_->GetInertial()->CoG().Cross(force));
+  link_->AddRelativeTorque(torque -
+  link_->GetInertial()->CoG().Cross(force));
 }
 
 void QrotorPlugin::rosPublish() {
