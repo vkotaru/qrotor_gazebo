@@ -1,0 +1,16 @@
+<?xml version='1.0'?>
+<sdf version='1.7'>    
+<model name="falcon">
+      <include>
+        <uri>model://drone</uri>
+        <pose>0.0 0.0 0.0 0 0 0</pose>
+        <name>falcon</name>
+      </include>
+
+      <plugin filename="libqrotor_plugin.so" name="qrotor_plugin">
+          <linkName>falcon::base_link</linkName>
+          <namespace>falcon</namespace>
+          <updateRate>500.0</updateRate>
+      </plugin>
+    </model>
+</sdf>

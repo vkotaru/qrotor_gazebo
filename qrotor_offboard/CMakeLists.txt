@@ -10,7 +10,7 @@ project(qrotor_offboard)
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   nav_msgs
-  qrotor_gazebo
+  qrotor_gazebo_plugin
   rospy
   std_msgs
 )
