@@ -5,14 +5,14 @@
     <arg name="robot_ns" default="$(arg vehicle_name)"/>
     <arg name="gazebo_ns" default=""/>
 
-    <include file="$(find qrotor_gazebo)/launch/spawn_sdf.launch">
-        <arg name="robot_name" value="pillow" />
+    <include file="$(find qrotor_gazebo_plugin)/launch/spawn_sdf.launch">
+        <arg name="robot_name" value="falcon" />
         <arg name="x" value="0.0" />
         <arg name="y" value="0.0" />
         <arg name="z" value="1.0" />
         <arg name="roll" value="0"/>
         <arg name="pitch" value="0"/>
         <arg name="yaw" value="0.0" />
-        <arg name="sdf_robot_file" value="$(find qrotor_gazebo)/models/falcon/model.sdf" />
+        <arg name="sdf_robot_file" value="$(find qrotor_gazebo_plugin)/models/falcon/model.sdf" />
     </include>
 </launch>

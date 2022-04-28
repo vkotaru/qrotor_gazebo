@@ -62,6 +62,18 @@ void QrotorGazeboPlugin::Load(gazebo::physics::ModelPtr _model,
                                                                    << "\".");
   }
 
+  if (!_sdf->HasElement("updateRate")) {
+    gzdbg << "[QrotorGazeboPlugin] missing <updateRate>, "
+             "defaults to 0.0"
+             " (as fast as possible)\n";
+    this->update_rate_ = 0;
+  } else {
+    this->update_rate_ = _sdf->GetElement("updateRate")->Get<double>();
+    gzdbg << "[QrotorGazeboPlugin] update rate " << update_rate_ << std::endl;
+  }
+  MAX_POS_CTRL_COUNT = std::ceil(update_rate_ / pos_loop_freq);
+  pos_ctrl_counter = MAX_POS_CTRL_COUNT;
+
   // Inertial setup
   inertia_ << link_->GetInertial()->IXX(), link_->GetInertial()->IXY(),
       link_->GetInertial()->IXZ(), link_->GetInertial()->IXY(),
@@ -95,13 +107,50 @@ void QrotorGazeboPlugin::Load(gazebo::physics::ModelPtr _model,
   sub_command_ = this->ctrl_nh_->subscribe(
       "command", 10, &QrotorGazeboPlugin::commandCallback, this);
 
-  this->ctrlQueueThread =
-      std::thread(std::bind(&QrotorGazeboPlugin::ctrlThread, this));
+#if GAZEBO_MAJOR_VERSION >= 8
+  this->last_time_ = this->world_->SimTime();
+#else
+  this->last_time_ = this->world_->GetSimTime();
+#endif
 
   gzdbg << "[QrotorGazeboPlugin]... loaded!";
 }
 
 void QrotorGazeboPlugin::Init() { queryState(); }
+
+void QrotorGazeboPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
+  double dt = _info.simTime.Double() - last_plugin_update.Double();
+  last_plugin_update = _info.simTime.Double();
+
+#if GAZEBO_MAJOR_VERSION >= 8
+  gazebo::common::Time cur_time = this->world_->SimTime();
+#else
+  gazebo::common::Time cur_time = this->world_->GetSimTime();
+#endif
+
+  if (cur_time < last_time_) {
+    gzdbg << "[QrotorGazeboPlugin] Negative update time difference detected.\n";
+    last_time_ = cur_time;
+  }
+  // rate control
+  if (update_rate_ > 0 &&
+      (cur_time - last_time_).Double() < (1.0 / this->update_rate_)) {
+
+  } else {
+    // compute "dt"
+    double dt = cur_time.Double() - last_time_.Double();
+    queryState();
+    if (pos_ctrl_counter == MAX_POS_CTRL_COUNT) {
+      computePosInput();
+      pos_ctrl_counter = 0;
+    } else {
+      pos_ctrl_counter++;
+    }
+    computeAttInput();
+  }
+
+  applyWrench(controller_.thrust() * E3, controller_.moment());
+}
 
 void QrotorGazeboPlugin::commandCallback(
     const qrotor_gazebo_plugin::Command::ConstPtr &msg) {
@@ -138,12 +187,6 @@ void QrotorGazeboPlugin::commandCallback(
   }
 }
 
-void QrotorGazeboPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
-  double dt = _info.simTime.Double() - last_plugin_update.Double();
-  last_plugin_update = _info.simTime.Double();
-  applyWrench(controller_.thrust() * E3, controller_.moment());
-}
-
 void QrotorGazeboPlugin::queryState() {
 
   auto gpose = link_->WorldCoGPose();
@@ -156,25 +199,7 @@ void QrotorGazeboPlugin::queryState() {
       vec3_to_eigen_from_gazebo(gomega)));
 }
 
-void QrotorGazeboPlugin::ctrlThread() {
-  ros::Rate loop_handle(att_loop_freq);
-  int MAX_POS_CTRL_COUNT = std::ceil(att_loop_freq / pos_loop_freq);
-  int pos_ctrl_counter = MAX_POS_CTRL_COUNT;
-  while (this->ctrl_nh_->ok()) {
-    queryState();
-    if (pos_ctrl_counter == MAX_POS_CTRL_COUNT) {
-      posCtrlThread();
-      pos_ctrl_counter = 0;
-    } else {
-      pos_ctrl_counter++;
-    }
-    attCtrlThread();
-    // loop handle
-    loop_handle.sleep();
-  }
-}
-
-void QrotorGazeboPlugin::posCtrlThread() {
+void QrotorGazeboPlugin::computePosInput() {
   double dt = pos_clock_.time();
   // compute input
   if (controller_.mode() == QrotorControl::POSITION ||
@@ -185,7 +210,7 @@ void QrotorGazeboPlugin::posCtrlThread() {
   rosPublish();
 }
 
-void QrotorGazeboPlugin::attCtrlThread() {
+void QrotorGazeboPlugin::computeAttInput() {
   double dt = att_clock_.time();
   // compute input
   if (controller_.mode() != QrotorControl::PASS_THROUGH) {

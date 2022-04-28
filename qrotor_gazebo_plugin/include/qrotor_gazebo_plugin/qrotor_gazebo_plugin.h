@@ -40,6 +40,13 @@ private:
   // Pointer to the update event connection.
   gazebo::event::ConnectionPtr updateConnection_;
 
+  /// \brief save last_time
+  gazebo::common::Time last_time_;
+  /// \brief update rate control
+  double update_rate_;
+  int MAX_POS_CTRL_COUNT = 3;
+  int pos_ctrl_counter = 0;
+
   GazeboPose initial_pose_{};
   void queryState();
 
@@ -54,9 +61,9 @@ private:
   ros::NodeHandlePtr ctrl_nh_;
   std::thread ctrlQueueThread;
   RosClock pos_clock_{}, att_clock_{};
-  void ctrlThread();
-  void posCtrlThread();
-  void attCtrlThread();
+
+  void computePosInput();
+  void computeAttInput();
   ros::Publisher pub_odom_truth_;
   ros::Subscriber sub_command_;
 

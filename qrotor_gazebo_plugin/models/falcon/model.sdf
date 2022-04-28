@@ -7,7 +7,7 @@
         <name>falcon</name>
       </include>
 
-      <plugin filename="libqrotor_plugin.so" name="qrotor_plugin">
+      <plugin filename="libqrotor_gazebo_plugin.so" name="qrotor_plugin">
           <linkName>falcon::base_link</linkName>
           <namespace>falcon</namespace>
           <updateRate>500.0</updateRate>
