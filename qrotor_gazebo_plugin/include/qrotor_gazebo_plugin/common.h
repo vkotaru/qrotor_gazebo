@@ -67,7 +67,7 @@ quat_to_eigen_from_gazebo(const GazeboQuaternion &quat) {
 
 inline Eigen::Matrix3d
 rotation_to_eigen_from_gazebo(const GazeboQuaternion &quat) {
-  return Eigen::Quaternion(quat.W(), quat.X(), quat.Y(), quat.Z())
+  return Eigen::Quaterniond(quat.W(), quat.X(), quat.Y(), quat.Z())
       .toRotationMatrix();
 }
 
