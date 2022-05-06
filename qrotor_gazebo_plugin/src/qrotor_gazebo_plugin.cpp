@@ -20,6 +20,10 @@ QrotorGazeboPlugin::~QrotorGazeboPlugin() {
 void QrotorGazeboPlugin::Reset() {
   link_->SetWorldPose(initial_pose_);
   link_->ResetPhysicsStates();
+  // controller_.posCtrl_.updateSetpoint(Eigen::Vector3d::Zero(),
+  //                                     Eigen::Vector3d::Zero(),
+  //                                     Eigen::Vector3d::Zero());
+  controller_.attCtrl_.updateCommand(Eigen::Vector3d::Zero());
   gzdbg << "[QrotorGazeboPlugin] Reset!" << std::endl;
 }
 
@@ -155,8 +159,9 @@ void QrotorGazeboPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
 void QrotorGazeboPlugin::commandCallback(
     const qrotor_gazebo_plugin::Command::ConstPtr &msg) {
 
-  controller_.setMode(msg->mode);
-  if (msg->mode == qrotor_gazebo_plugin::Command::MODE_POSITION) {
+  switch (msg->mode) {
+  case qrotor_gazebo_plugin::Command::MODE_POSITION: {
+    controller_.setMode(msg->mode);
     switch (msg->command.size()) {
     case 3:
       controller_.posCtrl_.updateSetpoint(
@@ -184,6 +189,19 @@ void QrotorGazeboPlugin::commandCallback(
     default:
       break;
     }
+  } break;
+
+  case qrotor_gazebo_plugin::Command::MODE_THRUST_YAW: {
+    controller_.setMode(msg->mode);
+    controller_.skipComputingPosInput(Eigen::Vector3d(
+        msg->command[0].x, msg->command[0].y, msg->command[0].z));
+    controller_.attCtrl_.updateYawSP(msg->yaw[0]);
+    break;
+  }
+
+  default:
+    ROS_WARN("mode: %d is not implement at this time", msg->mode);
+    break;
   }
 }
 

@@ -11,6 +11,8 @@ public:
     PASS_THROUGH,
     ATTITUDE,
     ATTITUDE_RATE,
+    THRUST_YAW,
+    THRUST_YAW_RATE,
     POSITION,
     POSITION_SPLINE
   };
@@ -51,24 +53,14 @@ public:
 
   void setMode(const int &mode) {
     switch (mode) {
-    case 0:
-      mode_ == PASS_THROUGH;
-      break;
-
-    case 1:
-      mode_ = ATTITUDE;
-      break;
-
-    case 2:
-      mode_ = POSITION;
-      break;
-
-    case 3:
-      mode_ = POSITION_SPLINE;
-      break;
-
-    default:
-      break;
+    case 0: mode_ == PASS_THROUGH; break;
+    case 1: mode_ = ATTITUDE; break;
+    case 2: mode_ = ATTITUDE_RATE; break;
+    case 3: mode_ = THRUST_YAW; break;
+    case 4: mode_ = THRUST_YAW_RATE; break;
+    case 5: mode_ = POSITION; break;
+    case 6: mode_ = POSITION_SPLINE; break;
+    default: break;
     }
   }
   const Mode &mode() const { return mode_; }
@@ -79,6 +71,11 @@ public:
 
   void computePositionInput(double dt) {
     thrust_vector_ = posCtrl_.run(dt, state_.position, state_.velocity);
+    attCtrl_.updateCommand(thrust_vector_);
+  }
+
+  void skipComputingPosInput(const Eigen::Vector3d &tv) {
+    thrust_vector_ = tv;
     attCtrl_.updateCommand(thrust_vector_);
   }
 
